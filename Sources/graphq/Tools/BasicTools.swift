@@ -112,7 +112,7 @@ final class TextTool: ToolController {
         // Clicking a container edits its label; clicking text edits that text.
         if let hit = store.hitTest(e.scene, tolerance: host.sceneDistance(4), includeLocked: false)
             ?? store.elements.last(where: { $0.type.isContainer && !$0.locked && HitTest.isInside($0, e.scene) }),
-           hit.type == .text || hit.type.isContainer {
+           hit.type == .text || hit.type.isContainer || hit.type.isLinear {
             store.selection = [hit.id]
             host.beginTextEditing(elementId: hit.id, isNew: false)
             return

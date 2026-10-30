@@ -174,12 +174,16 @@ struct PropertiesPanel: View {
         let linear = selected.first { $0.type.isLinear }
         PanelSection(title: "Arrow") {
             HStack(spacing: 4) {
-                ChipButton(isSelected: linear?.curved == false, help: "Sharp") {
-                    set("Arrow Type", { if $0.type.isLinear { $0.curved = false } }) { $0.curvedArrows = false }
-                } label: { ArrowTypeIcon(curved: false) }
-                ChipButton(isSelected: linear?.curved == true, help: "Curved") {
-                    set("Arrow Type", { if $0.type.isLinear { $0.curved = true } }) { $0.curvedArrows = true }
-                } label: { ArrowTypeIcon(curved: true) }
+                let current: ArrowType = linear.map { $0.elbowed ? .elbow : $0.curved ? .curved : .sharp } ?? .sharp
+                ForEach(ArrowType.allCases, id: \.self) { t in
+                    ChipButton(isSelected: current == t, help: t.title) {
+                        set("Arrow Type", { e in
+                            guard e.type.isLinear else { return }
+                            e.curved = t == .curved
+                            e.elbowed = t == .elbow
+                        }) { $0.arrowType = t }
+                    } label: { ArrowTypeIcon(type: t) }
+                }
                 Spacer(minLength: 6)
                 arrowheadMenu(current: linear?.startArrowhead ?? .none, isStart: true)
                 arrowheadMenu(current: linear?.endArrowhead ?? .arrow, isStart: false)
@@ -303,6 +307,16 @@ extension FontFamily {
         case .hand: "pencil.and.scribble"
         case .normal: "textformat"
         case .mono: "chevron.left.forwardslash.chevron.right"
+        }
+    }
+}
+
+extension ArrowType {
+    var title: String {
+        switch self {
+        case .sharp: "Sharp"
+        case .curved: "Curved"
+        case .elbow: "Elbow"
         }
     }
 }

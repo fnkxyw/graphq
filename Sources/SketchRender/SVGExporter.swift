@@ -26,7 +26,7 @@ public enum SVGExporter {
             out += "<defs><style>@font-face { font-family: Virgil; src: url(data:font/woff2;base64,\(font.base64EncodedString())) format('woff2'); }</style></defs>\n"
         }
         if options.includeBackground {
-            out += "<rect x=\"\(fmt(bounds.minX))\" y=\"\(fmt(bounds.minY))\" width=\"\(fmt(bounds.width))\" height=\"\(fmt(bounds.height))\" fill=\"\(color(theme.background).0)\"/>\n"
+            out += "<rect x=\"\(fmt(bounds.minX))\" y=\"\(fmt(bounds.minY))\" width=\"\(fmt(bounds.width))\" height=\"\(fmt(bounds.height))\" fill=\"\(theme.background.hexString)\"/>\n"
         }
 
         for e in elements {
@@ -40,8 +40,18 @@ public enum SVGExporter {
             switch e.type {
             case .image:
                 if let id = e.fileId, let f = files[id] {
-                    out += "  <image x=\"0\" y=\"0\" width=\"\(fmt(e.width))\" height=\"\(fmt(e.height))\" preserveAspectRatio=\"none\" href=\"data:\(f.mimeType);base64,\(f.data.base64EncodedString())\"/>\n"
+                    let href = "data:\(f.mimeType);base64,\(f.data.base64EncodedString())"
+                    if let c = e.crop {
+                        // Crop via a nested viewport over a unit-sized image.
+                        out += "  <svg x=\"0\" y=\"0\" width=\"\(fmt(e.width))\" height=\"\(fmt(e.height))\" viewBox=\"\(fmt(c.minX)) \(fmt(c.minY)) \(fmt(c.width)) \(fmt(c.height))\" preserveAspectRatio=\"none\"><image x=\"0\" y=\"0\" width=\"1\" height=\"1\" preserveAspectRatio=\"none\" href=\"\(href)\"/></svg>\n"
+                    } else {
+                        out += "  <image x=\"0\" y=\"0\" width=\"\(fmt(e.width))\" height=\"\(fmt(e.height))\" preserveAspectRatio=\"none\" href=\"\(href)\"/>\n"
+                    }
                 }
+            case .frame:
+                let fill = e.fillColor.isTransparent ? "none" : color(e.fillColor).0
+                out += "  <rect x=\"0\" y=\"0\" width=\"\(fmt(e.width))\" height=\"\(fmt(e.height))\" rx=\"6\" fill=\"\(fill)\" stroke=\"#8a8f98\" stroke-width=\"1.2\"/>\n"
+                out += "  <text x=\"2\" y=\"-7\" font-family=\"\(Fonts.cssFamily(.normal))\" font-size=\"13\" fill=\"#6b7280\">\(escape(e.text.isEmpty ? "Frame" : e.text))</text>\n"
             case .text:
                 out += textSVG(e, box: CGRect(x: 0, y: 0, width: e.width, height: e.height), wrap: false, color: color(e.strokeColor))
             default:
@@ -58,6 +68,16 @@ public enum SVGExporter {
                 }
                 if e.hasLabel {
                     out += textSVG(e, box: TextMetrics.labelBox(for: e), wrap: true, color: color(e.strokeColor))
+                }
+                if e.hasLinearLabel {
+                    let size = TextLayout(text: e.text, family: e.fontFamily, fontSize: e.fontSize).size
+                    var box = TextMetrics.linearLabelRect(for: e, size: size)
+                    let knock = box.insetBy(dx: -4, dy: -2)
+                    out += "  <rect x=\"\(fmt(knock.minX))\" y=\"\(fmt(knock.minY))\" width=\"\(fmt(knock.width))\" height=\"\(fmt(knock.height))\" fill=\"\(theme.background.hexString)\"/>\n"
+                    var centered = e
+                    centered.textAlign = .center
+                    box.size.height = size.height
+                    out += textSVG(centered, box: box, wrap: false, color: color(e.strokeColor))
                 }
             }
             out += "</g>\n"

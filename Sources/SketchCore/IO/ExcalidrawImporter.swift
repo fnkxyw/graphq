@@ -32,7 +32,7 @@ public enum ExcalidrawImporter {
         for raw in live {
             if raw["type"] as? String == "text", raw["containerId"] is String { continue }
             if var e = convert(raw) {
-                if let label = labelFor[e.id], e.type.isContainer {
+                if let label = labelFor[e.id], e.type.isContainer || e.type.isLinear {
                     applyText(label, to: &e)
                 }
                 elements.append(e)
@@ -141,7 +141,8 @@ public enum ExcalidrawImporter {
                 e.pressures = (raw["pressures"] as? [NSNumber])?.map(\.doubleValue) ?? []
                 e.simulatePressure = raw["simulatePressure"] as? Bool ?? true
             } else {
-                e.curved = hasRoundness && (raw["elbowed"] as? Bool) != true
+                e.elbowed = type == .arrow && (raw["elbowed"] as? Bool) == true
+                e.curved = hasRoundness && !e.elbowed
                 e.startArrowhead = arrowhead(raw["startArrowhead"])
                 e.endArrowhead = type == .arrow ? arrowhead(raw["endArrowhead"]) : .none
                 if type == .line { e.startArrowhead = .none }

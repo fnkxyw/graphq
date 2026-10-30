@@ -1,6 +1,10 @@
 import Foundation
 import SketchCore
 
+enum ArrowType: String, CaseIterable {
+    case sharp, curved, elbow
+}
+
 /// Style applied to newly created elements. Updated whenever the user changes a
 /// property in the panel, so the next shape "remembers" the last used style.
 struct StyleDefaults: Equatable {
@@ -17,7 +21,7 @@ struct StyleDefaults: Equatable {
     var textAlign: TextAlign = .left
     var startArrowhead: Arrowhead = .none
     var endArrowhead: Arrowhead = .arrow
-    var curvedArrows: Bool = false
+    var arrowType: ArrowType = .sharp
 
     func makeElement(_ type: ElementType) -> Element {
         var e = Element(type: type)
@@ -36,7 +40,8 @@ struct StyleDefaults: Equatable {
             e.startArrowhead = startArrowhead
             e.endArrowhead = endArrowhead
         }
-        e.curved = type.isLinear && curvedArrows
+        e.curved = type.isLinear && arrowType == .curved
+        e.elbowed = type == .arrow && arrowType == .elbow
         return e
     }
 }

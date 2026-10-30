@@ -130,6 +130,12 @@ public enum TextMetrics {
         }
     }
 
+    /// Box of an arrow/line label of the given size, centered on the path midpoint (local).
+    public static func linearLabelRect(for e: Element, size: CGSize) -> CGRect {
+        let a = e.labelAnchor
+        return CGRect(x: a.x - size.width / 2, y: a.y - size.height / 2, width: size.width, height: size.height)
+    }
+
     /// Minimum container height so that its label fits.
     public static func requiredContainerHeight(for e: Element) -> CGFloat {
         let box = labelBox(for: e)

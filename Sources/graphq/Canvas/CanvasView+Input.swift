@@ -127,7 +127,7 @@ extension CanvasView {
             return
         case 36, 76: // return, enter
             if store.selection.count == 1, let id = store.selection.first, let e = store.element(id),
-               e.type == .text || e.type.isContainer, !e.locked {
+               e.type == .text || e.type.isContainer || e.type.isLinear || e.type == .frame, !e.locked {
                 beginTextEditing(elementId: id, isNew: false)
             }
             return

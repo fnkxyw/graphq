@@ -78,6 +78,13 @@ public struct Element: Identifiable, Hashable, Sendable {
 
     // Image
     public var fileId: String?
+    /// Visible part of the image, normalized to the source (0...1). `nil` = whole image.
+    public var crop: CGRect?
+
+    /// Linear elements: route as an orthogonal (elbow) connector.
+    public var elbowed: Bool = false
+    /// Frame this element belongs to (clipped to and moved with it).
+    public var frameId: String?
 
     public init(
         id: String = ElementID.make(),
@@ -125,6 +132,8 @@ public struct Element: Identifiable, Hashable, Sendable {
     }
 
     public var hasLabel: Bool { type.isContainer && !text.isEmpty }
+    /// Text label drawn at the middle of an arrow/line.
+    public var hasLinearLabel: Bool { type.isLinear && !text.isEmpty }
 }
 
 // MARK: - Codable
@@ -135,7 +144,7 @@ extension Element: Codable {
         case strokeColor, fillColor, fillStyle, strokeWidth, strokeStyle, roughness, opacity, roundness
         case seed, version, versionNonce, groupIds, boundElements, locked
         case points, pressures, simulatePressure, startBinding, endBinding, startArrowhead, endArrowhead, curved
-        case text, fontSize, fontFamily, textAlign, fileId
+        case text, fontSize, fontFamily, textAlign, fileId, crop, elbowed, frameId
     }
 
     public init(from decoder: Decoder) throws {
@@ -164,6 +173,9 @@ extension Element: Codable {
             textAlign: try v(.textAlign, .center),
             fileId: try c.decodeIfPresent(String.self, forKey: .fileId)
         )
+        crop = try c.decodeIfPresent(CGRect.self, forKey: .crop)
+        elbowed = try v(.elbowed, false)
+        frameId = try c.decodeIfPresent(String.self, forKey: .frameId)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -202,6 +214,7 @@ extension Element: Codable {
             try c.encode(startArrowhead, forKey: .startArrowhead)
             try c.encode(endArrowhead, forKey: .endArrowhead)
             try c.encode(curved, forKey: .curved)
+            if elbowed { try c.encode(elbowed, forKey: .elbowed) }
         }
         if type == .text || !text.isEmpty {
             try c.encode(text, forKey: .text)
@@ -210,6 +223,8 @@ extension Element: Codable {
             try c.encode(textAlign, forKey: .textAlign)
         }
         try c.encodeIfPresent(fileId, forKey: .fileId)
+        try c.encodeIfPresent(crop, forKey: .crop)
+        try c.encodeIfPresent(frameId, forKey: .frameId)
     }
 }
 

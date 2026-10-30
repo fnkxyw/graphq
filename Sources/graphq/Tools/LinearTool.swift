@@ -67,6 +67,12 @@ final class LinearTool: ToolController {
     func mouseUp(_ e: PointerEvent) {
         guard case .dragging(let id, let pts, let down) = state else { return }
         if down.distance(to: e.view) < 4 {
+            if host.store.element(id)?.elbowed == true {
+                // Elbow connectors are drag-only.
+                host.store.cancelInteraction()
+                state = .idle
+                return
+            }
             // Click without drag: switch to click-to-add-points mode.
             state = .polyline(id: id, points: [pts[0], pts[0]])
             return
@@ -155,7 +161,7 @@ final class LinearTool: ToolController {
            let target = ArrowBinding.target(at: end, in: store.elements, excluding: [id], threshold: host.sceneDistance(4)) {
             store.setBinding(ArrowBinding.makeBinding(to: target, at: end), end: .end, arrowId: id)
         }
-        if let bound = store.element(id), bound.startBinding != nil || bound.endBinding != nil {
+        if let bound = store.element(id), bound.startBinding != nil || bound.endBinding != nil || bound.elbowed {
             store.update(id) { ArrowBinding.updateEndpoints(of: &$0) { store.element($0) } }
         }
         store.selection = [id]

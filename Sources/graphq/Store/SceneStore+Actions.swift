@@ -206,6 +206,7 @@ extension SceneStore {
                 update(id) { e in
                     body(&e)
                     TextFitter.fit(&e)
+                    if e.elbowed { ArrowBinding.updateEndpoints(of: &e) { self.element($0) } }
                 }
             }
             refreshBindings(for: targets)

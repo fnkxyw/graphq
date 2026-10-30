@@ -66,7 +66,7 @@ public extension Element {
 
     /// Polyline of what is actually drawn for linear elements (curves are flattened).
     var localPath: [CGPoint] {
-        if type.isLinear && curved && points.count > 2 {
+        if type.isLinear && curved && !elbowed && points.count > 2 {
             return Curves.sampleCatmullRom(points)
         }
         return points

@@ -43,8 +43,13 @@ public enum ArrowBinding {
         return hit + dir * b.gap
     }
 
-    /// Recomputes both endpoints of a linear element from its bindings.
+    /// Recomputes both endpoints of a linear element from its bindings
+    /// (and re-routes elbow arrows).
     public static func updateEndpoints(of arrow: inout Element, lookup: (String) -> Element?) {
+        if arrow.elbowed {
+            routeElbow(&arrow, lookup: lookup)
+            return
+        }
         var pts = arrow.absolutePoints
         guard pts.count >= 2 else { return }
         let n = pts.count
@@ -69,6 +74,37 @@ public enum ArrowBinding {
             pts[n - 1] = boundEndpoint(b, target: t, reference: endRef)
         }
         arrow.setAbsolutePoints(pts)
+    }
+
+    /// Elbow arrows: bound ends attach to the side of the target facing the other end,
+    /// then the path is re-routed orthogonally.
+    static func routeElbow(_ arrow: inout Element, lookup: (String) -> Element?) {
+        let pts = arrow.absolutePoints
+        guard let first = pts.first, let last = pts.last, pts.count >= 2 else { return }
+        let startTarget = arrow.startBinding.flatMap { lookup($0.elementId) }
+        let endTarget = arrow.endBinding.flatMap { lookup($0.elementId) }
+        // What each end "looks at": the other target's center, or the other free endpoint.
+        let startRef = endTarget?.aabb.center ?? last
+        let endRef = startTarget?.aabb.center ?? first
+
+        var start = first, end = last
+        var sh = ElbowRouter.heading(from: first, toward: last)
+        var eh = ElbowRouter.heading(from: last, toward: first)
+        if let t = startTarget, let b = arrow.startBinding {
+            let box = t.aabb
+            sh = ElbowRouter.side(of: box, facing: startRef)
+            start = ElbowRouter.attachPoint(on: box, side: sh, focus: focusPoint(b, on: t), gap: b.gap)
+        }
+        if let t = endTarget, let b = arrow.endBinding {
+            let box = t.aabb
+            eh = ElbowRouter.side(of: box, facing: endRef)
+            end = ElbowRouter.attachPoint(on: box, side: eh, focus: focusPoint(b, on: t), gap: b.gap)
+        }
+        if startTarget == nil { sh = ElbowRouter.heading(from: start, toward: end) }
+        if endTarget == nil { eh = ElbowRouter.heading(from: end, toward: start) }
+        // Elbow arrows are always axis-aligned.
+        arrow.angle = 0
+        arrow.setAbsolutePoints(ElbowRouter.route(start: start, startHeading: sh, end: end, endHeading: eh))
     }
 
     /// Updates every linear element bound to one of `targetIds`. Returns ids of changed arrows.

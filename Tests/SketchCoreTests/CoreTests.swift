@@ -366,3 +366,50 @@ struct IOTests {
         #expect(arrow.absolutePoints.last!.distance(to: CGPoint(x: 4, y: 50)) < 1e-6)
     }
 }
+
+// MARK: - Elbow arrows & labels
+
+@Suite("Elbow arrows")
+struct ElbowTests {
+    private func isOrthogonal(_ pts: [CGPoint]) -> Bool {
+        zip(pts, pts.dropFirst()).allSatisfy { abs($0.x - $1.x) < 1e-6 || abs($0.y - $1.y) < 1e-6 }
+    }
+
+    @Test func routesAreOrthogonalForAllHeadingCombos() {
+        let headings: [Heading] = [.up, .down, .left, .right]
+        for sh in headings { for eh in headings {
+            for end in [CGPoint(x: 300, y: 120), CGPoint(x: -200, y: -80), CGPoint(x: 10, y: 300)] {
+                let r = ElbowRouter.route(start: .zero, startHeading: sh, end: end, endHeading: eh)
+                #expect(r.first == .zero && r.last == end)
+                #expect(isOrthogonal(r), "\(sh)->\(eh) to \(end): \(r)")
+            }
+        } }
+    }
+
+    @Test func boundElbowAttachesToFacingSides() {
+        let a = Element(id: "a", type: .rectangle, x: 0, y: 0, width: 100, height: 100)
+        let b = Element(id: "b", type: .rectangle, x: 400, y: 200, width: 100, height: 100)
+        var arrow = Element(id: "x", type: .arrow)
+        arrow.elbowed = true
+        arrow.setAbsolutePoints([a.center, b.center])
+        var els = [a, b, arrow]
+        let index = ["a": 0, "b": 1, "x": 2]
+        ArrowBinding.setBinding(ArrowBinding.makeBinding(to: a, at: a.center), end: .start, arrowId: "x", in: &els, index: index)
+        ArrowBinding.setBinding(ArrowBinding.makeBinding(to: b, at: b.center), end: .end, arrowId: "x", in: &els, index: index)
+        var routed = els[2]
+        let snapshot = els
+        ArrowBinding.updateEndpoints(of: &routed) { index[$0].map { snapshot[$0] } }
+        let pts = routed.absolutePoints
+        #expect(isOrthogonal(pts))
+        #expect(abs(pts.first!.x - (100 + ArrowBinding.defaultGap)) < 1e-6)
+        #expect(abs(pts.last!.x - (400 - ArrowBinding.defaultGap)) < 1e-6)
+    }
+
+    @Test func labelAnchorIsPathMidpoint() {
+        var e = Element(type: .arrow)
+        e.setAbsolutePoints([CGPoint(x: 0, y: 0), CGPoint(x: 100, y: 0), CGPoint(x: 100, y: 100)])
+        e.text = "label"
+        #expect(e.toScene(e.labelAnchor).distance(to: CGPoint(x: 100, y: 0)) < 1e-6)
+        #expect(HitTest.hits(e, CGPoint(x: 100, y: 2), tolerance: 1))
+    }
+}

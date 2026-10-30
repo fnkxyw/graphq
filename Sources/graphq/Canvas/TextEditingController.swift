@@ -46,18 +46,24 @@ final class TextEditingController: NSObject, NSTextViewDelegate {
     func layout() {
         guard let e = element else { return }
         let zoom = canvas.viewport.zoom
-        let fontSize = e.fontSize * zoom
-        let font = Fonts.nsFont(e.fontFamily, size: fontSize)
+        let isFrame = e.type == .frame
+        let fontSize = (isFrame ? 13 : e.fontSize) * zoom
+        let font = Fonts.nsFont(isFrame ? .normal : e.fontFamily, size: fontSize)
         let lineHeight = fontSize * TextLayout.lineHeightFactor
 
         let para = NSMutableParagraphStyle()
         para.minimumLineHeight = lineHeight
         para.maximumLineHeight = lineHeight
-        para.alignment = switch e.textAlign {
+        let align: NSTextAlignment = switch e.textAlign {
         case .left: .left
         case .center: .center
         case .right: .right
         }
+        para.alignment = e.type.isLinear ? .center : isFrame ? .left : align
+        // Arrow labels sit on a knockout so the line doesn't show through while typing.
+        textView.drawsBackground = e.type.isLinear
+        let bg = canvas.renderer.theme.background
+        textView.backgroundColor = NSColor(srgbRed: bg.r, green: bg.g, blue: bg.b, alpha: 1)
         let color = NSColor(cgColor: canvas.renderer.cgColor(e.strokeColor)) ?? .labelColor
         // TextKit puts extra line height above the glyphs; shift them to match the renderer.
         let baselineShift = (lineHeight - (font.ascender - font.descender)) / 2
@@ -72,7 +78,17 @@ final class TextEditingController: NSObject, NSTextViewDelegate {
         }
 
         let frame: CGRect
-        if e.type == .text {
+        if isFrame {
+            let origin = canvas.viewport.toView(CGPoint(x: e.x + 2, y: e.y - Element.frameTitleHeight + 2))
+            frame = CGRect(x: origin.x, y: origin.y, width: max(e.width * zoom, 120), height: lineHeight)
+            textView.textContainer?.size = CGSize(width: frame.width, height: .greatestFiniteMagnitude)
+        } else if e.type.isLinear {
+            let size = TextMetrics.measure(textView.string, family: e.fontFamily, fontSize: e.fontSize)
+            let anchor = canvas.viewport.toView(e.toScene(e.labelAnchor))
+            let w = max(size.width * zoom, 20) + fontSize
+            frame = CGRect(x: anchor.x - w / 2, y: anchor.y - size.height * zoom / 2, width: w, height: size.height * zoom)
+            textView.textContainer?.size = CGSize(width: frame.width, height: .greatestFiniteMagnitude)
+        } else if e.type == .text {
             let size = TextMetrics.measure(textView.string, family: e.fontFamily, fontSize: e.fontSize)
             let origin = canvas.viewport.toView(CGPoint(x: e.x, y: e.y))
             // Leave room for the caret at the end of the longest line.
@@ -95,7 +111,7 @@ final class TextEditingController: NSObject, NSTextViewDelegate {
             textView.frame.origin.x -= e.textAlign == .center ? extra / 2 : extra
         }
         // Match the element rotation around the shape's center.
-        if e.angle != 0 {
+        if e.angle != 0 && !e.type.isLinear {
             let center = canvas.viewport.toView(e.center)
             let shift = frame.center.rotated(around: center, by: e.angle) - frame.center
             textView.frame.origin = textView.frame.origin + shift

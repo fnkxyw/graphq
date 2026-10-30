@@ -5,8 +5,9 @@ public enum HitTest {
     /// Whether scene point `p` hits element `e`. `tolerance` is in scene units
     /// (callers pass a screen-space tolerance divided by zoom).
     public static func hits(_ e: Element, _ p: CGPoint, tolerance: CGFloat) -> Bool {
-        // Cheap reject on the rotated bounding box first.
-        let slop = tolerance + e.strokeWidth
+        // Cheap reject on the rotated bounding box first (labels/titles may stick out of it).
+        let slop = tolerance + e.strokeWidth + (e.hasLinearLabel ? e.approximateLabelSize.width / 2 : 0)
+            + (e.type == .frame ? Element.frameTitleHeight : 0)
         guard e.aabb.insetBy(dx: -slop, dy: -slop).contains(p) else { return false }
 
         let local = e.toLocal(p)
@@ -19,8 +20,18 @@ public enum HitTest {
         case .text, .image:
             return CGRect(x: 0, y: 0, width: e.width, height: e.height)
                 .insetBy(dx: -tolerance, dy: -tolerance).contains(local)
+        case .frame:
+            if e.frameTitleRect.insetBy(dx: -tolerance, dy: -tolerance).contains(local) { return true }
+            if !e.fillColor.isTransparent && CGRect(x: 0, y: 0, width: e.width, height: e.height).contains(local) { return true }
+            return Polygon.distanceToOutline(CGRect(x: 0, y: 0, width: e.width, height: e.height).corners, local) <= tolerance + 2
         case .arrow, .line:
             let path = e.localPath
+            if e.hasLinearLabel {
+                let a = e.labelAnchor, size = e.approximateLabelSize
+                if CGRect(x: a.x - size.width / 2, y: a.y - size.height / 2, width: size.width, height: size.height).contains(local) {
+                    return true
+                }
+            }
             if e.isClosedPath && !e.fillColor.isTransparent && Polygon.contains(path, local) { return true }
             return Polygon.distanceToOutline(path, local, closed: false) <= tolerance + e.strokeWidth / 2
         case .freedraw:
@@ -36,7 +47,7 @@ public enum HitTest {
         case .rectangle, .ellipse, .diamond:
             if Polygon.contains(e.localOutline, local) { return true }
             return padding > 0 && Polygon.distanceToOutline(e.localOutline, local) <= padding
-        case .text, .image:
+        case .text, .image, .frame:
             return CGRect(x: 0, y: 0, width: e.width, height: e.height)
                 .insetBy(dx: -padding, dy: -padding).contains(local)
         default:

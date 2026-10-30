@@ -58,7 +58,7 @@ public enum ShapeBuilder {
         case .ellipse: return ellipseShape(e)
         case .arrow, .line: return linearShape(e)
         case .freedraw: return freedrawShape(e)
-        case .text, .image: return []
+        case .text, .image, .frame: return []
         }
     }
 
@@ -110,7 +110,7 @@ public enum ShapeBuilder {
         guard e.points.count >= 2 else { return [] }
         let o = options(for: e)
         let gen = RoughGenerator(options: o)
-        let body = e.curved && e.points.count > 2 ? gen.curve(e.points) : gen.linearPath(e.points, close: false)
+        let body = e.curved && !e.elbowed && e.points.count > 2 ? gen.curve(e.points) : gen.linearPath(e.points, close: false)
         var items: [DrawItem] = []
         if e.isClosedPath && !e.fillColor.isTransparent {
             items += fillItems(e, polygon: e.localPath, gen: RoughGenerator(options: o))

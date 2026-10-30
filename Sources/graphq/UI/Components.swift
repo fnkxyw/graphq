@@ -246,13 +246,18 @@ struct EdgeIcon: View {
 }
 
 struct ArrowTypeIcon: View {
-    let curved: Bool
+    let type: ArrowType
     var body: some View {
         Path { p in
             p.move(to: CGPoint(x: 2, y: 14))
-            if curved {
+            switch type {
+            case .curved:
                 p.addCurve(to: CGPoint(x: 18, y: 3), control1: CGPoint(x: 4, y: 2), control2: CGPoint(x: 12, y: 14))
-            } else {
+            case .elbow:
+                p.addLine(to: CGPoint(x: 10, y: 14))
+                p.addLine(to: CGPoint(x: 10, y: 3))
+                p.addLine(to: CGPoint(x: 18, y: 3))
+            case .sharp:
                 p.addLine(to: CGPoint(x: 9, y: 4))
                 p.addLine(to: CGPoint(x: 18, y: 12))
             }

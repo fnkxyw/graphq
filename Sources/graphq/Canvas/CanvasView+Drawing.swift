@@ -143,7 +143,7 @@ extension CanvasView {
         ctx.stroke(e.aabb.insetBy(dx: -4 / zoom, dy: -4 / zoom))
         guard !locked else { return }
         let r = 4.5 / zoom
-        if let selection = tool as? SelectionTool {
+        if let selection = tool as? SelectionTool, !e.elbowed {
             let mr = 3.5 / zoom
             ctx.setFillColor(accent.copy(alpha: 0.35) ?? accent)
             for i in 0..<(pts.count - 1) {
@@ -151,7 +151,7 @@ extension CanvasView {
                 ctx.fillEllipse(in: CGRect(x: m.x - mr, y: m.y - mr, width: mr * 2, height: mr * 2))
             }
         }
-        for (i, p) in pts.enumerated() {
+        for (i, p) in pts.enumerated() where !e.elbowed || i == 0 || i == pts.count - 1 {
             let rect = CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)
             let bound = (i == 0 && e.startBinding != nil) || (i == pts.count - 1 && e.endBinding != nil)
             ctx.setFillColor(bound ? accent : NSColor.white.cgColor)

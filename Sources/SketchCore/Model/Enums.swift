@@ -1,7 +1,7 @@
 import Foundation
 
 public enum ElementType: String, Codable, Sendable, CaseIterable {
-    case rectangle, ellipse, diamond, arrow, line, freedraw, text, image
+    case rectangle, ellipse, diamond, arrow, line, freedraw, text, image, frame
 
     /// Shapes with a closed outline that can hold a label and accept arrow bindings.
     public var isContainer: Bool { self == .rectangle || self == .ellipse || self == .diamond }

@@ -12,7 +12,7 @@ final class SelectionTool: ToolController {
         case resizing(handle: ResizeHandle, originals: [Element], frame: SelectionFrame)
         case rotating(center: CGPoint, startAngle: CGFloat, originals: [Element])
         case marquee(start: CGPoint, current: CGPoint, base: Set<String>)
-        case pointDrag(id: String, index: Int, original: Element)
+        case pointDrag(id: String, index: Int, isLast: Bool, original: Element)
     }
 
     private unowned let host: CanvasHost
@@ -39,8 +39,9 @@ final class SelectionTool: ToolController {
         // 1. Point handles of a single selected linear element.
         if let linear = singleEditableLinear() {
             let pts = linear.absolutePoints
-            if let i = pts.firstIndex(where: { $0.distance(to: e.scene) <= host.sceneDistance(7) }) {
-                if e.clickCount == 2 && pts.count > 2 {
+            let editable = linear.elbowed ? [0, pts.count - 1] : Array(pts.indices)
+            if let i = editable.first(where: { pts[$0].distance(to: e.scene) <= host.sceneDistance(7) }) {
+                if e.clickCount == 2 && pts.count > 2 && !linear.elbowed {
                     // Double-click a point to remove it.
                     store.perform("Delete Point") {
                         var p = pts
@@ -52,11 +53,11 @@ final class SelectionTool: ToolController {
                     return
                 }
                 store.beginInteraction()
-                state = .pointDrag(id: linear.id, index: i, original: linear)
+                state = .pointDrag(id: linear.id, index: i, isLast: i == pts.count - 1, original: linear)
                 return
             }
             // Midpoint handles insert a new point (this is how arrows get bent).
-            for i in 0..<(pts.count - 1) {
+            for i in 0..<(linear.elbowed ? 0 : pts.count - 1) {
                 let mid = midpoint(of: linear, segment: i)
                 if mid.distance(to: e.scene) <= host.sceneDistance(7) {
                     store.beginInteraction()
@@ -64,7 +65,7 @@ final class SelectionTool: ToolController {
                     p.insert(mid, at: i + 1)
                     store.update(linear.id) { $0.setAbsolutePoints(p) }
                     if let updated = store.element(linear.id) {
-                        state = .pointDrag(id: linear.id, index: i + 1, original: updated)
+                        state = .pointDrag(id: linear.id, index: i + 1, isLast: false, original: updated)
                     }
                     return
                 }
@@ -131,7 +132,7 @@ final class SelectionTool: ToolController {
             store.selection = Groups.expand([hit.id], in: store.elements, editingGroupId: g)
             if store.selection.count > 1 { return }
         }
-        if hit.type == .text || hit.type.isContainer {
+        if hit.type == .text || hit.type.isContainer || hit.type.isLinear || hit.type == .frame {
             store.selection = [hit.id]
             host.beginTextEditing(elementId: hit.id, isNew: false)
         }
@@ -170,8 +171,8 @@ final class SelectionTool: ToolController {
                 .map(\.id)
             store.selection = base.union(Groups.expand(Set(enclosed), in: store.elements, editingGroupId: store.editingGroupId))
             host.overlayNeedsDisplay()
-        case .pointDrag(let id, let index, let original):
-            dragPoint(id: id, index: index, original: original, e: e)
+        case .pointDrag(let id, let index, let isLast, let original):
+            dragPoint(id: id, index: index, isLast: isLast, original: original, e: e)
         }
     }
 
@@ -232,7 +233,7 @@ final class SelectionTool: ToolController {
         store.refreshBindings(for: ids)
     }
 
-    private func dragPoint(id: String, index: Int, original: Element, e: PointerEvent) {
+    private func dragPoint(id: String, index: Int, isLast: Bool, original: Element, e: PointerEvent) {
         var pts = original.absolutePoints
         guard index < pts.count else { return }
         var p = host.snap(point: e.scene, excluding: [id])
@@ -244,7 +245,7 @@ final class SelectionTool: ToolController {
             p = anchor + CGPoint(x: cos(a) * d.length, y: sin(a) * d.length)
         }
         pts[index] = p
-        let isEnd = index == 0 || index == pts.count - 1
+        let isEnd = index == 0 || isLast
         var el = store.element(id) ?? original
         el.setAbsolutePoints(pts)
         if isEnd && original.type.isLinear {
@@ -276,8 +277,8 @@ final class SelectionTool: ToolController {
             store.endInteraction("Rotate")
         case .marquee:
             host.overlayNeedsDisplay()
-        case .pointDrag(let id, let index, _):
-            commitPointDrag(id: id, index: index)
+        case .pointDrag(let id, let index, let isLast, _):
+            commitPointDrag(id: id, isStart: index == 0, isEnd: isLast)
         case .idle:
             break
         }
@@ -287,11 +288,10 @@ final class SelectionTool: ToolController {
         host.editor.hasInteracted = true
     }
 
-    private func commitPointDrag(id: String, index: Int) {
+    private func commitPointDrag(id: String, isStart: Bool, isEnd: Bool) {
         guard let el = store.element(id) else { store.endInteraction("Edit Points"); return }
-        let count = el.points.count
-        if el.type.isLinear && (index == 0 || index == count - 1) {
-            let end: LinearEnd = index == 0 ? .start : .end
+        if el.type.isLinear && (isStart || isEnd) {
+            let end: LinearEnd = isStart ? .start : .end
             let binding = end == .start ? el.startBinding : el.endBinding
             // Clear the preview, then bind properly so the target's back-reference is kept in sync.
             store.update(id) { if end == .start { $0.startBinding = nil } else { $0.endBinding = nil } }
