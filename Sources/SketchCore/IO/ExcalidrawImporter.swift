@@ -104,6 +104,7 @@ public enum ExcalidrawImporter {
         case "freedraw": type = .freedraw
         case "text": type = .text
         case "image": type = .image
+        case "frame", "magicframe": type = .frame
         default: return nil
         }
         var e = Element(id: id, type: type)
@@ -121,6 +122,7 @@ public enum ExcalidrawImporter {
         e.version = Int(num(raw["version"], 1))
         e.groupIds = raw["groupIds"] as? [String] ?? []
         e.locked = raw["locked"] as? Bool ?? false
+        e.frameId = raw["frameId"] as? String
 
         let hasRoundness = raw["roundness"] is [String: Any]
         if hasRoundness && (type == .rectangle || type == .diamond || type == .image) {
@@ -151,6 +153,9 @@ public enum ExcalidrawImporter {
             applyText(raw, to: &e)
         case .image:
             e.fileId = raw["fileId"] as? String
+        case .frame:
+            e.text = raw["name"] as? String ?? ""
+            e.fillColor = .transparent
         default:
             break
         }

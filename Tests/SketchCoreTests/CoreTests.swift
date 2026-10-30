@@ -352,7 +352,7 @@ struct IOTests {
         ],"files":{}}
         """
         let scene = try ExcalidrawImporter.importScene(Data(json.utf8))
-        #expect(scene.elements.map(\.id) == ["r1", "a1"])
+        #expect(scene.elements.map(\.id) == ["r1", "a1", "f"])
         let rect = scene.elements[0]
         #expect(rect.text == "Box")
         #expect(rect.fillStyle == .crossHatch)
@@ -411,5 +411,34 @@ struct ElbowTests {
         e.text = "label"
         #expect(e.toScene(e.labelAnchor).distance(to: CGPoint(x: 100, y: 0)) < 1e-6)
         #expect(HitTest.hits(e, CGPoint(x: 100, y: 2), tolerance: 1))
+    }
+}
+
+@Suite("Excalidraw export")
+struct ExcalidrawExportTests {
+    @Test func roundTripThroughExcalidraw() throws {
+        let box = Element(id: "box", type: .rectangle, x: 10, y: 20, width: 120, height: 60,
+                          fillColor: RGBAColor(hex: "#d7e5ff")!, fillStyle: .crossHatch, roundness: 8, text: "Label")
+        var arrow = Element(id: "arr", type: .arrow, endArrowhead: .triangle, text: "go")
+        arrow.setAbsolutePoints([CGPoint(x: -200, y: 50), CGPoint(x: 4, y: 50)])
+        var frame = Element(id: "f", type: .frame, x: -300, y: -50, width: 600, height: 300, text: "Flow")
+        frame.fillColor = .transparent
+        var els = [frame, box, arrow]
+        els[1].frameId = "f"
+        let index = ["f": 0, "box": 1, "arr": 2]
+        ArrowBinding.setBinding(ArrowBinding.makeBinding(to: box, at: CGPoint(x: 10, y: 50)), end: .end,
+                                arrowId: "arr", in: &els, index: index)
+        let data = try ExcalidrawExporter.export(SceneData(elements: els)) { t, _, s in
+            CGSize(width: Double(t.count) * s * 0.6, height: s * 1.25)
+        }
+        #expect(ExcalidrawImporter.isExcalidraw(data))
+        let back = try ExcalidrawImporter.importScene(data)
+        #expect(back.elements.map(\.id) == ["f", "box", "arr"])
+        #expect(back.elements[0].type == .frame && back.elements[0].text == "Flow")
+        #expect(back.elements[1].text == "Label" && back.elements[1].frameId == "f")
+        #expect(back.elements[1].fillStyle == .crossHatch && back.elements[1].roundness > 0)
+        #expect(back.elements[2].text == "go")
+        #expect(back.elements[2].endBinding?.elementId == "box")
+        #expect(back.elements[2].absolutePoints.last!.distance(to: arrow.absolutePoints.last!) < 1e-6)
     }
 }

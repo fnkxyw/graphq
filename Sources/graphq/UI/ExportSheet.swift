@@ -5,7 +5,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 enum ExportFormat: String, CaseIterable, Identifiable {
-    case png = "PNG", svg = "SVG", pdf = "PDF"
+    case png = "PNG", svg = "SVG", pdf = "PDF", excalidraw = "Excalidraw"
     var id: String { rawValue }
 
     var contentType: UTType {
@@ -13,8 +13,11 @@ enum ExportFormat: String, CaseIterable, Identifiable {
         case .png: .png
         case .svg: .svg
         case .pdf: .pdf
+        case .excalidraw: .excalidraw
         }
     }
+
+    var isImage: Bool { self != .excalidraw }
 }
 
 struct ExportSheet: View {
@@ -69,8 +72,10 @@ struct ExportSheet: View {
                     }
                     .pickerStyle(.segmented)
                 }
-                Toggle("Background", isOn: $background)
-                Toggle("Dark mode", isOn: $darkMode)
+                if format.isImage {
+                    Toggle("Background", isOn: $background)
+                    Toggle("Dark mode", isOn: $darkMode)
+                }
                 Toggle("Only selected", isOn: $onlySelected)
                     .disabled(store.selection.isEmpty)
             }
@@ -82,6 +87,7 @@ struct ExportSheet: View {
 
             HStack {
                 Button("Copy PNG") { copyPNG() }
+                    .disabled(!format.isImage)
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
@@ -132,6 +138,9 @@ struct ExportSheet: View {
             case .png: data = try SceneExporter.png(elements, files: store.files, options: options)
             case .pdf: data = try SceneExporter.pdf(elements, files: store.files, options: options)
             case .svg: data = Data(try SVGExporter.svg(elements, files: store.files, options: options).utf8)
+            case .excalidraw:
+                let scene = SceneData(elements: elements, files: store.files, settings: store.settings)
+                data = try ExcalidrawExporter.export(scene) { TextMetrics.measure($0, family: $1, fontSize: $2) }
             }
             try data.write(to: url, options: .atomic)
             dismiss()
